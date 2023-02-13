@@ -12,28 +12,38 @@ editor_options:
 knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
-library(ggbiplot)
 library(stats)
 library(factoextra)
 library(cluster)
 ```
 
-## R Markdown
+### Part 1: Implementing a Simple Prediction Pipeline
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+# Loading in class4_p1.csv Dataset
+```{r}
+class4_p1<-read.csv("./class4_p1.csv", header=TRUE)
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+colnames(class4_p1)[1] ="patcid"
 
-```{r cars}
-summary(cars)
+#Checking the variable types
+str(class4_p1)
+
+#Converting categorical variables into factors
+class4_p1$chronic1<-as.factor(class4_p1$chronic1)
+class4_p1$chronic3<-as.factor(class4_p1$chronic3)
+class4_p1$chronic4<-as.factor(class4_p1$chronic4)
+class4_p1$tobacco1<-as.factor(class4_p1$tobacco1)
+class4_p1$alcohol1<-as.factor(class4_p1$alcohol1)
+class4_p1$habits5<-as.factor(class4_p1$habits5)
+class4_p1$habits7<-as.factor(class4_p1$habits7)
+class4_p1$agegroup<-as.factor(class4_p1$agegroup)
+class4_p1$dem3<-as.factor(class4_p1$dem3)
+class4_p1$dem4<-as.factor(class4_p1$dem4)
+class4_p1$dem8<-as.factor(class4_p1$dem8)
+class4_p1$povertygroup<-as.factor(class4_p1$povertygroup)
+
+str(class4_p1)
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
 
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
