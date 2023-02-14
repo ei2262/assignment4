@@ -1,49 +1,208 @@
 ---
 title: "ei2262_assignment4"
 output:
-  html_document: default
-editor_options:
-  chunk_output_type: inline
-  markdown: 
-    wrap: 72
+  word_document: default
 ---
 
-```{r setup, include=FALSE}
+```{r setup}
 knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
 library(stats)
 library(factoextra)
 library(cluster)
+library(caret)
+
+set.seed(123)
 ```
 
 ### Part 1: Implementing a Simple Prediction Pipeline
 
-# Loading in class4_p1.csv Dataset
-```{r}
-class4_p1<-read.csv("./class4_p1.csv", header=TRUE)
+#### Loading in class4_p1.csv Dataset and Performing Basic Data Cleaning
 
-colnames(class4_p1)[1] ="patcid"
+```{r}
+class4_p1 = read_csv("./class4_p1.csv")
 
 #Checking the variable types
 str(class4_p1)
 
 #Converting categorical variables into factors
-class4_p1$chronic1<-as.factor(class4_p1$chronic1)
-class4_p1$chronic3<-as.factor(class4_p1$chronic3)
-class4_p1$chronic4<-as.factor(class4_p1$chronic4)
-class4_p1$tobacco1<-as.factor(class4_p1$tobacco1)
-class4_p1$alcohol1<-as.factor(class4_p1$alcohol1)
-class4_p1$habits5<-as.factor(class4_p1$habits5)
-class4_p1$habits7<-as.factor(class4_p1$habits7)
-class4_p1$agegroup<-as.factor(class4_p1$agegroup)
-class4_p1$dem3<-as.factor(class4_p1$dem3)
-class4_p1$dem4<-as.factor(class4_p1$dem4)
-class4_p1$dem8<-as.factor(class4_p1$dem8)
-class4_p1$povertygroup<-as.factor(class4_p1$povertygroup)
+class4_p1 =
+  class4_p1 %>% 
+  mutate(
+    chronic1 = as.factor(chronic1),
+    chronic3 = as.factor(chronic3),
+    chronic4 = as.factor(chronic4),
+    tobacco1 = as.factor(tobacco1),
+    alcohol1 = as.factor(alcohol1),
+    habits5 = as.factor(habits5),
+    habits7 = as.factor(habits7),
+    agegroup = as.factor(agegroup),
+    dem3 = as.factor(dem3),
+    dem4 = as.factor(dem4),
+    dem8 = as.factor(dem8),
+    povertygroup = as.factor(povertygroup))
 
+#Checking to make sure variables were properly converted to factors
 str(class4_p1)
+
+#Omit missing data
+class4.nomiss<-na.omit(class4_p1)
+```
+For the two prediction models, I have chosen the following features to include in the linear regression model:
+
+Model 1 = Age (agegroup), How physically active are you? (habits5), In general, how healthy is your overall diet? (habits7), BMI (bmi), Minutes of total physical activity on home chores on an average day (gpaq8totmin), How many days did you walk to get to and from places in the last 7 days? (gpaq11days) 
+
+Model 2 = Age (Agegroup), BMI (bmi), Do you usually smoke 3 or more cigarettes on
+most days, some days, or never? (tobacco1), Do you usually have more than 2 drinks of
+alcohol on most days, some days, or never? (alcohol1), Do you currently have hypertension? (chronic1), Do you currently have diabetes diagnosed by a medical professional? (chronic3), In the last 12 months, have you had an episode of asthma or an asthma attack? (chronic4)
+
+#### Setting up Data for Analysis
+
+The numeric variables will be scaled and centered.
+```{r, eval = FALSE}
+class4.numeric<- class4.nomiss %>% dplyr::select(where(is.numeric))
+
+set.up.preprocess<-preProcess(class4.numeric, method=c("center", "scale"))
+transformed.vals<-predict(set.up.preprocess, class4.numeric)
 ```
 
+#### Partitioning Outcome Variable (Healthydays) into Training and Testing (70/30 Split)
+```{r}
+train.index<-createDataPartition(class4.nomiss$healthydays, p=0.7, list=FALSE)
+
+#Training set (70%)
+class4.train<-class4.nomiss[train.index,]
+
+#Testing set (30%)
+class4.test<-class4.nomiss[-train.index,]
+```
+
+#### Model Training and Testing
+
+Prediction Model 1: Agegroup, Habits5, Habits7, BMI, gpaq8totmin, gpaq11days
+This model includes a subset of features that focus on age, BMI, and the amount and type of physical activity an individual reported.
+```{r}
+model_1 = lm(healthydays ~ agegroup + habits5 + habits7 + bmi + gpaq8totmin + gpaq11days, data = class4.train)
+
+fitted_results1 = predict(model_1, class4.train, type = 'response')
+
+fitted_results2 = postResample(fitted_results1, class4.train$healthydays)
+fitted_results2
+```
+
+Prediction Model 2: Agegroup, BMI, tobacco1, alcohol1, chronic1, chronic3, chronic4
+This model includes a subset of features that focus on age, BMI, smoking and drinking patterns, and underlying chronic diagnoses (diabetes, hypertension, asthma)
+```{r}
+model_2 = lm(healthydays ~ agegroup + bmi + tobacco1 + alcohol1 + chronic1 + chronic3 + chronic4, data = class4.train) 
+
+fitted_results3 = predict(model_2, class4.train, type = 'response')
+
+fitted_results4 = postResample(fitted_results3, class4.train$healthydays)
+fitted_results4
+
+```
+
+After applying both models within the test data, it was determined that Model 1 was the preferred prediction model. Model 1 had the lower root mean square error (RMSE) value, 7.2186 vs. 7.23934 (Model 2). Model 1 also had the higher R^2 value, 0.09527 vs. 0.09006 (Model 2). Since Model 1 has the lower RMSE as well as the higher R^2 value, it is the preferred prediction model over Model 2. 
+
+### Q3: Describe one setting (in 1-2 sentences) where the implementation of your final model would be useful.
+
+The implementation of my final model would be useful when the researchers are exploring the effects of physical activity, age, and BMI on individuals reporting having good physical health. This would be useful information in creating a program that focuses on promoting the mental and physical benefits of moving our body, whether it is through everyday activities like chores or physical activity like weight training.
 
 
+### Part 2: Conducting an Unsupervised Analysis
+
+#### Loading in US Arrests Dataset and Performing Basic Data Cleaning
+
+```{r}
+us_arrests <- USArrests
+
+us_arrests <-na.omit(us_arrests)
+
+#Checking if we need to scale and center
+colMeans(us_arrests, na.rm=TRUE)
+apply(us_arrests, 2, sd, na.rm=TRUE)
+
+arrests_scaled<-scale(us_arrests)
+```
+Scaled and centered the dataset because there are differences in mean and standard deviation. To avoid any dependency on an arbitrury variable, I used `scale` to standardize the dataset.  
+
+#### Agglomerative Algorithm for Hierarchical Clustering 
+
+Hierarchical Clustering will be conducted using complete Linkage. Euclidian distance measure will be used to construct the dissimilar matrix
+```{r}
+#Creating Dissimilar Matrix
+diss.matrix <- dist(arrests_scaled, method = "euclidean")
+
+clusters.arrests<- hclust(diss.matrix, method = "complete" )
+
+#Plotting Cluster Dendrogram to see Clusters
+plot(clusters.arrests, cex = 0.6, hang = -1)
+```
+
+#### Q4a: Determine the Optimal Number of Clusters Using a Clear, Data-Driven Strategy.
+
+The optimal number of clusters will be determined using Gap Statistics. I will plot and print the optimal number of clusters to identify the value of k (# of clusters) that has the highest gap statistic.
+```{r}
+gap_stat <- clusGap(arrests_scaled, FUN = hcut, nstart = 25, K.max = 10, B = 50)
+print(gap_stat, method="firstmax")
+fviz_gap_stat(gap_stat)
+```
+Using gap statistics, it was determined that 4 was the optimal number of clusters. At [4,], the gap statistic is the highest value (0.3025). The graph also shows that the highest gap statistic at k = 4.
+
+#### Q4b: Describe the composition of each cluster in terms of the original input features.
+
+I will use the number of clusters from the gap statistic to obtain cluster assignment for each observation. 
+```{r}
+#Identifying the number of observations in each cluster
+clusters.arrests4<-cutree(clusters.arrests, k=4)
+table(clusters.arrests4)
+
+#Attaching a label of each state to identify the cluster assignment for each observation.
+arrests_labeled <- cbind(USArrests, cluster = clusters.arrests4)
+
+arrests_labeled %>% 
+  group_by(cluster) %>%
+  summarise_all(mean) %>% 
+  knitr::kable(caption = "Composition of Each Cluster")
+```
+
+There are a total of 4 clusters. There are 8 states in Cluster 1, 11 states in Cluster 2, 21 states in Cluster 3, and 10 states in Cluster 4.
+
+Cluster 1: Alabama, Alaska, Georgia, Louisiana, Mississippi, North Carolina, South Carolina, and Tennessee
+```{r}
+arrests_labeled %>% 
+  select(cluster) %>% 
+  filter(cluster == 1) %>% 
+  knitr::kable(caption = "Cluster 1")
+```
+
+Cluster 2: Arizona, California, Colorado, Florida, Illinois, Maryland, Michigan, Nevada, New Mexico, New York, and Texas
+```{r}
+arrests_labeled %>% 
+  select(cluster) %>% 
+  filter(cluster == 2) %>% 
+  knitr::kable(caption = "Cluster 2")
+```
+
+Cluster 3: Arkansas, Connecticut, Delaware, Hawaii, Indiana, Kansas, Kentucky, Massachusetts, Minnesota, Missouri, New Jersey, Ohio, Oklahoma, Oregon, Pennsylvania, Rhode Island, Utah, Virginia, Washington, Wisconsin, and Wyoming
+```{r}
+arrests_labeled %>% 
+  select(cluster) %>% 
+  filter(cluster == 3) %>% 
+  knitr::kable(caption = "Cluster 3")
+```
+
+Cluster 4: Idaho, Iowa, Maine, Montana, Nebraska, New Hampshire, North Dakota, South Dakota, Vermont, and West Virginia
+```{r}
+arrests_labeled %>% 
+  select(cluster) %>% 
+  filter(cluster == 4) %>% 
+  knitr::kable(caption = "Cluster 4")
+```
+
+#### Q5: Pretend that the data are from 2020 and not 1973. Describe one research question that can be addressed using the newly identified clusters. Briefly comment on any scientific or ethical considerations one should review before using these clusters for your specific question. NOTE: The clusters can be used as an exposure, an outcome, or a covariate. 
+
+If this data is from 2020, one research question that can be addressed using the newly identified clusters is, "Do states with similar violence profiles predict higher incidence of mental health disorders?"
+
+Some considerations one should review before using these clusters for this specific question include the effects socioeconomic status of the residents in each cluster has on the statistics. USArrests dataset are statistics on the arrests per 100.000 residents for assault, murder, and rape in each of the 50 US states in 1973. If this data was collected in 2020, we must be cautious of the socioeconomic status of states and regions that have higher rates of arrests. We must also take into consideration racial disparities in the judicial system. 
